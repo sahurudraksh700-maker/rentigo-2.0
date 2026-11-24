@@ -1,16 +1,33 @@
-import { Package } from 'lucide-react';
-import { useState } from 'react';
+import { Heart, MapPin, Package, Star } from 'lucide-react';
+import { useEffect, useState, type MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { listingsService } from '../services/listingsService';
-import type { Listing, UserProfile } from '../types/rentkaro';
+import { reviewsService } from '../services/reviewsService';
+import { wishlistService } from '../services/wishlistService';
+import type { Listing, UserProfile } from '../types/rentigo';
+import { formatPublicUserName } from '../utils/badges';
+import { TrustBadges } from './TrustBadges';
 
 interface ListingCardProps {
   listing: Listing;
   owner?: UserProfile | null;
+  onWishlistChange?: () => void;
 }
 
-export function ListingCard({ listing, owner }: ListingCardProps) {
+export function ListingCard({ listing, owner, onWishlistChange }: ListingCardProps) {
+  const { user, openSignIn } = useAuth();
+  const { showToast } = useToast();
   const [imgFailed, setImgFailed] = useState(false);
+  const [saved, setSaved] = useState(() =>
+    wishlistService.isWishlistedSync(user?.id, listing.id),
+  );
+
+  useEffect(() => {
+    setSaved(wishlistService.isWishlistedSync(user?.id, listing.id));
+  }, [user?.id, listing.id]);
+
   const rentedToday = listingsService.isRentedTodaySync(listing.id);
   const statusLabel = listing.isPaused
     ? 'Paused'
@@ -23,6 +40,35 @@ export function ListingCard({ listing, owner }: ListingCardProps) {
     : rentedToday
       ? 'bg-[#e63f24]/90 text-white border-[#e63f24]'
       : 'bg-emerald-950/85 text-emerald-200 border-emerald-700/60';
+
+  const ratingSummary = reviewsService.getListingRatingSummarySync(listing.id);
+  const displayRating =
+    ratingSummary.count > 0 ? ratingSummary.average : owner?.rating ?? 5.0;
+  const displayReviewCount =
+    ratingSummary.count > 0 ? ratingSummary.count : owner?.reviewCount ?? 0;
+
+  const handleToggleWishlist = async (e: MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) {
+      openSignIn();
+      return;
+    }
+    const next = !saved;
+    setSaved(next); // optimistic UI
+    try {
+      const res = await wishlistService.toggle(user.id, listing.id);
+      setSaved(res.saved);
+      showToast(
+        res.saved ? 'Saved to wishlist' : 'Removed from wishlist',
+        res.saved ? 'success' : 'info',
+      );
+      onWishlistChange?.();
+    } catch {
+      setSaved(!next);
+      showToast('Could not update wishlist', 'error');
+    }
+  };
 
   const primaryPhoto = listing.photos[0];
 
@@ -49,6 +95,19 @@ export function ListingCard({ listing, owner }: ListingCardProps) {
             </span>
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={handleToggleWishlist}
+          aria-label={saved ? `Remove ${listing.title} from wishlist` : `Save ${listing.title} to wishlist`}
+          aria-pressed={saved}
+          className="absolute top-3 left-3 w-8 h-8 rounded-full bg-black/55 hover:bg-black/75 backdrop-blur-sm text-white flex items-center justify-center transition-transform active:scale-95"
+        >
+          <Heart
+            className={`w-4 h-4 ${saved ? 'fill-[#e63f24] text-[#e63f24]' : 'text-white'}`}
+          />
+        </button>
+
         <span
           className={`absolute top-3 right-3 px-2.5 py-1 rounded-md border text-[11px] font-medium tracking-wide backdrop-blur-sm ${statusClasses}`}
         >
@@ -66,8 +125,26 @@ export function ListingCard({ listing, owner }: ListingCardProps) {
             <span aria-hidden="true">·</span>
             <span>{listing.condition}</span>
             <span aria-hidden="true">·</span>
-            <span>{owner?.firstName ?? 'Student'}</span>
+            <span>{formatPublicUserName(owner, user?.id)}</span>
           </div>
+
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-1.5">
+            <span className="inline-flex items-center gap-1 text-[11px] text-slate-500 dark:text-slate-400">
+              <MapPin className="w-3 h-3 text-[#e63f24]" />
+              <span>{listing.college}</span>
+            </span>
+            <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-700 dark:text-slate-300">
+              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+              <span>{displayRating.toFixed(1)}</span>
+              <span className="text-[11px] text-slate-400">({displayReviewCount})</span>
+            </span>
+          </div>
+
+          {owner && (
+            <div className="mt-2">
+              <TrustBadges user={owner} compact max={2} />
+            </div>
+          )}
         </div>
 
         <div className="pt-3 border-t border-slate-100 dark:border-slate-800/80 flex items-baseline justify-between gap-2 tabular-nums">

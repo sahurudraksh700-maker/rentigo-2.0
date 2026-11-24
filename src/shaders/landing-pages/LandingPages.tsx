@@ -15,7 +15,7 @@ export function KageLandingPage(props: LandingPageProps & PageTypographyProps) {
     <LandingPageFrame
       {...frame}
       customization={customization}
-      title="RentKaro — Don't buy it. Rent it from a classmate."
+      title="Rentigo — Don't buy it. Rent it from a classmate."
       sourceUrl="/landing-pages/kage.html"
     />
   );

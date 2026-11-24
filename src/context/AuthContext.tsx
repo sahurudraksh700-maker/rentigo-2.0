@@ -6,16 +6,26 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { notificationsService } from '../services/notificationsService';
+import { dbStore } from '../services/storage';
 import { usersService } from '../services/usersService';
-import type { UserProfile } from '../types/rentkaro';
+import type { UserProfile } from '../types/rentigo';
 import { useToast } from './ToastContext';
+
+type ProfilePatch = Partial<
+  Pick<
+    UserProfile,
+    'name' | 'college' | 'phone' | 'photoUrl' | 'language' | 'privacySettings' | 'notificationSettings'
+  >
+>;
 
 interface AuthContextValue {
   user: UserProfile | null;
   allUsers: UserProfile[];
   loading: boolean;
   signInOpen: boolean;
+  pendingReferralCode: string | null;
   openSignIn: (redirectPath?: string) => void;
   closeSignIn: () => void;
   signInWithPreset: (userId: string) => Promise<void>;
@@ -24,10 +34,10 @@ interface AuthContextValue {
     email: string;
     college: string;
     phone: string;
+    referralCode?: string;
   }) => Promise<void>;
-  updateProfile: (
-    patch: Partial<Pick<UserProfile, 'name' | 'college' | 'phone' | 'photoUrl'>>,
-  ) => Promise<void>;
+  updateProfile: (patch: ProfilePatch) => Promise<void>;
+  deleteAccount: () => Promise<void>;
   signOut: () => Promise<void>;
   refreshUsers: () => Promise<void>;
 }
@@ -40,8 +50,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [signInOpen, setSignInOpen] = useState(false);
   const [redirectAfter, setRedirectAfter] = useState<string | null>(null);
+  const [pendingReferralCode, setPendingReferralCode] = useState<string | null>(() =>
+    dbStore.getPendingReferralCode(),
+  );
   const navigate = useNavigate();
+  const location = useLocation();
   const { showToast } = useToast();
+
+  // Capture ?ref=CODE query param from URL on landing or any route
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const refParam = params.get('ref');
+    if (refParam && refParam.trim()) {
+      const normalized = refParam.trim().toUpperCase();
+      dbStore.setPendingReferralCode(normalized);
+      setPendingReferralCode(normalized);
+    }
+  }, [location.search]);
 
   const refreshUsers = useCallback(async () => {
     const [current, list] = await Promise.all([
@@ -50,11 +75,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     ]);
     setUser(current);
     setAllUsers(list);
+    if (current) {
+      await notificationsService.checkReturnRemindersForUser(current.id);
+    }
   }, []);
 
   useEffect(() => {
     refreshUsers().finally(() => setLoading(false));
   }, [refreshUsers]);
+
+  // Keep user state fresh across tabs and local store mutations
+  useEffect(() => {
+    const onSync = () => {
+      usersService.getCurrentUser().then((current) => setUser(current));
+      usersService.listUsers().then((list) => setAllUsers(list));
+    };
+    window.addEventListener('rentigo-store-updated', onSync);
+    window.addEventListener('storage', onSync);
+    return () => {
+      window.removeEventListener('rentigo-store-updated', onSync);
+      window.removeEventListener('storage', onSync);
+    };
+  }, []);
 
   const openSignIn = useCallback((redirectPath?: string) => {
     setRedirectAfter(redirectPath ?? null);
@@ -70,6 +112,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (signedInUser: UserProfile) => {
       setUser(signedInUser);
       setSignInOpen(false);
+      setPendingReferralCode(dbStore.getPendingReferralCode());
       showToast(`Signed in as ${signedInUser.name}`, 'success');
       if (redirectAfter) {
         const next = redirectAfter;
@@ -90,7 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const signInCustom = useCallback(
-    async (input: { name: string; email: string; college: string; phone: string }) => {
+    async (input: {
+      name: string;
+      email: string;
+      college: string;
+      phone: string;
+      referralCode?: string;
+    }) => {
       const signed = await usersService.signInWithGoogleCustom(input);
       await refreshUsers();
       finishAuth(signed);
@@ -99,7 +148,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const updateProfile = useCallback(
-    async (patch: Partial<Pick<UserProfile, 'name' | 'college' | 'phone' | 'photoUrl'>>) => {
+    async (patch: ProfilePatch) => {
       if (!user) throw new Error('Sign in required.');
       const updated = await usersService.updateProfile(user.id, patch);
       setUser(updated);
@@ -108,6 +157,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
     [refreshUsers, showToast, user],
   );
+
+  const deleteAccount = useCallback(async () => {
+    if (!user) return;
+    await usersService.deleteAccount(user.id);
+    setUser(null);
+    await refreshUsers();
+    showToast('Account removed from this device', 'info');
+    navigate('/browse');
+  }, [navigate, refreshUsers, showToast, user]);
 
   const signOut = useCallback(async () => {
     await usersService.signOut();
@@ -122,11 +180,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         allUsers,
         loading,
         signInOpen,
+        pendingReferralCode,
         openSignIn,
         closeSignIn,
         signInWithPreset,
         signInCustom,
         updateProfile,
+        deleteAccount,
         signOut,
         refreshUsers,
       }}

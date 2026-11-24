@@ -1,15 +1,30 @@
-import { ArrowLeft, ImagePlus, PauseCircle, PlayCircle, Trash2, Upload, X } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowLeft,
+  BadgeCheck,
+  ImagePlus,
+  PauseCircle,
+  PlayCircle,
+  Trash2,
+  Upload,
+  X,
+} from 'lucide-react';
 import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { CAMPUS_OPTIONS } from '../data/seedData';
+import { faqService } from '../services/faqService';
 import { listingsService } from '../services/listingsService';
 import {
   LISTING_CATEGORIES,
+  type CancellationPolicy,
   type ItemCondition,
   type ListingCategory,
-} from '../types/rentkaro';
+} from '../types/rentigo';
+import { extractCampusName } from '../utils/badges';
 import { todayIsoDate } from '../utils/dates';
+import { usePageMeta } from '../utils/seo';
 
 const SAMPLE_PHOTOS = [
   { label: 'Camera', url: '/src/assets/images/listing_sony_camera_1795450626545.jpg' },
@@ -66,6 +81,15 @@ export function ListingFormPage() {
   const { user, openSignIn } = useAuth();
   const { showToast } = useToast();
 
+  usePageMeta({
+    title: isEdit ? 'Edit Listing — Rentigo' : 'List an Item — Rentigo',
+  });
+
+  const settings = faqService.getPlatformSettingsSync();
+  const needsVerification = Boolean(
+    user && settings.requireVerificationToTransact && !user.isVerified && !isEdit,
+  );
+
   const [loading, setLoading] = useState(isEdit);
   const [notAllowed, setNotAllowed] = useState<string | null>(null);
 
@@ -75,7 +99,13 @@ export function ListingFormPage() {
   const [condition, setCondition] = useState<ItemCondition>('Good');
   const [pricePerDay, setPricePerDay] = useState('200');
   const [deposit, setDeposit] = useState('1000');
+  const [lateFeePerDay, setLateFeePerDay] = useState('100');
+  const [cancellationPolicy, setCancellationPolicy] =
+    useState<CancellationPolicy>('Flexible');
   const [pickupLocation, setPickupLocation] = useState('Central Library Steps');
+  const [college, setCollege] = useState(
+    user ? extractCampusName(user.college) : 'IIT Delhi',
+  );
   const [availableFrom, setAvailableFrom] = useState(todayIsoDate());
   const [availableTo, setAvailableTo] = useState(defaultEndDate());
   const [photos, setPhotos] = useState<string[]>([]);
@@ -84,6 +114,12 @@ export function ListingFormPage() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+
+  useEffect(() => {
+    if (!isEdit && user) {
+      setCollege(extractCampusName(user.college));
+    }
+  }, [isEdit, user]);
 
   useEffect(() => {
     if (!isEdit || !id) return;
@@ -107,7 +143,10 @@ export function ListingFormPage() {
         setCondition(found.condition);
         setPricePerDay(String(found.pricePerDay));
         setDeposit(String(found.deposit));
+        setLateFeePerDay(String(found.lateFeePerDay ?? 100));
+        setCancellationPolicy(found.cancellationPolicy ?? 'Flexible');
         setPickupLocation(found.pickupLocation);
+        setCollege(found.college);
         setAvailableFrom(found.availableFrom);
         setAvailableTo(found.availableTo);
         setPhotos(found.photos);
@@ -129,7 +168,7 @@ export function ListingFormPage() {
             Sign in to list an item
           </h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            RentKaro requires a verified student profile before you can post gear on campus.
+            Rentigo requires a verified student profile before you can post gear on campus.
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">
             <button
@@ -223,6 +262,7 @@ export function ListingFormPage() {
 
     const numericPrice = Number(pricePerDay);
     const numericDeposit = Number(deposit);
+    const numericLateFee = Number(lateFeePerDay);
 
     if (title.trim().length < 4) {
       setError('Enter a clear item title (at least 4 characters).');
@@ -263,7 +303,10 @@ export function ListingFormPage() {
           condition,
           pricePerDay: numericPrice,
           deposit: numericDeposit,
+          lateFeePerDay: numericLateFee,
+          cancellationPolicy,
           pickupLocation,
+          college,
           availableFrom,
           availableTo,
           photos,
@@ -279,7 +322,10 @@ export function ListingFormPage() {
           condition,
           pricePerDay: numericPrice,
           deposit: numericDeposit,
+          lateFeePerDay: numericLateFee,
+          cancellationPolicy,
           pickupLocation,
+          college,
           availableFrom,
           availableTo,
           photos,
@@ -389,6 +435,24 @@ export function ListingFormPage() {
           Turn idle gear in your hostel room into pocket money while helping a classmate out.
         </p>
 
+        {needsVerification && (
+          <div className="mt-5 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-800 dark:text-amber-200 flex items-start gap-2.5">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">
+                Student verification is currently required to publish listings.
+              </p>
+              <Link
+                to="/settings?tab=verify"
+                className="inline-flex items-center gap-1 mt-1 font-semibold text-[#e63f24] hover:underline"
+              >
+                <BadgeCheck className="w-3.5 h-3.5" />
+                Verify with .edu/.ac.in email or student ID →
+              </Link>
+            </div>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="mt-6 space-y-5">
           {error && (
             <div className="rounded-xl border border-[#e63f24]/30 bg-[#e63f24]/10 px-4 py-3 text-sm text-[#e63f24]">
@@ -410,7 +474,7 @@ export function ListingFormPage() {
             />
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Category
@@ -442,9 +506,24 @@ export function ListingFormPage() {
                 <option value="Fair">Fair</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Cancellation Policy
+              </label>
+              <select
+                value={cancellationPolicy}
+                onChange={(e) => setCancellationPolicy(e.target.value as CancellationPolicy)}
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3.5 py-2.5 text-sm text-slate-950 dark:text-white outline-none focus:border-[#e63f24]"
+              >
+                <option value="Flexible">Flexible (Full refund 24h before)</option>
+                <option value="Moderate">Moderate (50% refund under 24h)</option>
+                <option value="Strict">Strict (No refund after pickup day)</option>
+              </select>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Price per day (₹)
@@ -460,7 +539,7 @@ export function ListingFormPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                Refundable Security Deposit (₹)
+                Refundable Deposit (₹)
               </label>
               <input
                 type="number"
@@ -471,20 +550,55 @@ export function ListingFormPage() {
                 required
               />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Late Return Fee / day (₹)
+              </label>
+              <input
+                type="number"
+                min={0}
+                value={lateFeePerDay}
+                onChange={(e) => setLateFeePerDay(e.target.value)}
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3.5 py-2.5 text-sm text-slate-950 dark:text-white outline-none focus:border-[#e63f24] tabular-nums"
+                required
+              />
+            </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-              Campus Pickup Location
-            </label>
-            <input
-              type="text"
-              value={pickupLocation}
-              onChange={(e) => setPickupLocation(e.target.value)}
-              placeholder="e.g. Hostel 4 Lobby / Central Library Steps"
-              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3.5 py-2.5 text-sm text-slate-950 dark:text-white outline-none focus:border-[#e63f24]"
-              required
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Campus
+              </label>
+              <input
+                type="text"
+                list="rentigo-campus-suggestions"
+                value={college}
+                onChange={(e) => setCollege(e.target.value)}
+                placeholder="IIT Delhi"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3.5 py-2.5 text-sm text-slate-950 dark:text-white outline-none focus:border-[#e63f24]"
+                required
+              />
+              <datalist id="rentigo-campus-suggestions">
+                {CAMPUS_OPTIONS.filter((c) => c !== 'All Campuses').map((c) => (
+                  <option key={c} value={c} />
+                ))}
+              </datalist>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
+                Campus Pickup Location
+              </label>
+              <input
+                type="text"
+                value={pickupLocation}
+                onChange={(e) => setPickupLocation(e.target.value)}
+                placeholder="e.g. Hostel 4 Lobby / Central Library Steps"
+                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3.5 py-2.5 text-sm text-slate-950 dark:text-white outline-none focus:border-[#e63f24]"
+                required
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -608,7 +722,7 @@ export function ListingFormPage() {
             </Link>
             <button
               type="submit"
-              disabled={saving}
+              disabled={saving || needsVerification}
               className="px-6 py-2.5 rounded-xl bg-[#e63f24] hover:bg-[#cc3118] text-white text-sm font-medium transition-colors disabled:opacity-50"
             >
               {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Publish Listing'}

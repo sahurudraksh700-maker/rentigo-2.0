@@ -1,16 +1,30 @@
-import { useState, type FormEvent } from 'react';
-import { X, ArrowRight, UserPlus } from 'lucide-react';
+import { ArrowRight, Gift, Shield, UserPlus, X } from 'lucide-react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export function GoogleSignInModal() {
-  const { signInOpen, closeSignIn, allUsers, signInWithPreset, signInCustom } = useAuth();
+  const {
+    signInOpen,
+    closeSignIn,
+    allUsers,
+    pendingReferralCode,
+    signInWithPreset,
+    signInCustom,
+  } = useAuth();
   const [mode, setMode] = useState<'pick' | 'custom'>('pick');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [college, setCollege] = useState('');
   const [phone, setPhone] = useState('');
+  const [referralCode, setReferralCode] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (pendingReferralCode && !referralCode) {
+      setReferralCode(pendingReferralCode);
+    }
+  }, [pendingReferralCode, referralCode]);
 
   if (!signInOpen) return null;
 
@@ -47,11 +61,18 @@ export function GoogleSignInModal() {
     }
     setBusy(true);
     try {
-      await signInCustom({ name, email, college, phone });
+      await signInCustom({
+        name,
+        email,
+        college,
+        phone,
+        referralCode: referralCode.trim() || undefined,
+      });
       setName('');
       setEmail('');
       setCollege('');
       setPhone('');
+      setReferralCode('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign in failed.');
     } finally {
@@ -64,9 +85,9 @@ export function GoogleSignInModal() {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="rk-google-signin-title"
+      aria-labelledby="rentigo-google-signin-title"
     >
-      <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b101d] text-slate-900 dark:text-slate-100 shadow-2xl overflow-hidden">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b101d] text-slate-900 dark:text-slate-100 shadow-2xl">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2.5">
             <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" aria-hidden="true">
@@ -87,7 +108,7 @@ export function GoogleSignInModal() {
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
               />
             </svg>
-            <h2 id="rk-google-signin-title" className="text-base font-medium">
+            <h2 id="rentigo-google-signin-title" className="text-base font-medium">
               Sign in with Google
             </h2>
           </div>
@@ -103,9 +124,19 @@ export function GoogleSignInModal() {
 
         <div className="p-6">
           <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-            Choose a campus Google account to continue to RentKaro, or sign in with your own
-            student email.
+            Choose a campus demo account to continue to Rentigo, or create an account with your
+            own email.
           </p>
+
+          {pendingReferralCode && (
+            <div className="mb-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3.5 py-2 text-xs text-emerald-700 dark:text-emerald-300 flex items-center gap-2">
+              <Gift className="w-4 h-4 shrink-0" />
+              <span>
+                Referral code <strong>{pendingReferralCode}</strong> ready! Use &ldquo;Create /
+                Use another Google account&rdquo; to apply it.
+              </span>
+            </div>
+          )}
 
           {error && (
             <div className="mb-4 rounded-xl border border-[#e63f24]/30 bg-[#e63f24]/10 px-3.5 py-2.5 text-sm text-[#e63f24]">
@@ -128,7 +159,15 @@ export function GoogleSignInModal() {
                       {account.firstName.charAt(0)}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-sm font-medium truncate">{account.name}</div>
+                      <div className="text-sm font-medium truncate flex items-center gap-1.5">
+                        <span>{account.name}</span>
+                        {account.role === 'admin' && (
+                          <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-semibold bg-amber-500/15 text-amber-700 dark:text-amber-300">
+                            <Shield className="w-2.5 h-2.5" />
+                            Admin
+                          </span>
+                        )}
+                      </div>
                       <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
                         {account.email} · {account.college}
                       </div>
@@ -166,13 +205,13 @@ export function GoogleSignInModal() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                  Campus / Google Email
+                  Campus / Google Email (.edu or .ac.in auto-verifies)
                 </label>
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="rohan.verma@campus.edu"
+                  placeholder="rohan.verma@iitd.ac.in"
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#070a12] px-3.5 py-2.5 text-sm outline-none focus:border-[#e63f24]"
                 />
               </div>
@@ -190,7 +229,7 @@ export function GoogleSignInModal() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                  WhatsApp / Phone Number (shared only on accepted requests)
+                  WhatsApp / Phone Number (hidden until booking Accepted)
                 </label>
                 <input
                   type="tel"
@@ -198,6 +237,18 @@ export function GoogleSignInModal() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+91 98765 43210"
                   className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#070a12] px-3.5 py-2.5 text-sm outline-none focus:border-[#e63f24]"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
+                  Referral Code (Optional — ₹50 credit after 1st completed rental)
+                </label>
+                <input
+                  type="text"
+                  value={referralCode}
+                  onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                  placeholder="AARAV50"
+                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#070a12] px-3.5 py-2.5 text-sm uppercase outline-none focus:border-[#e63f24]"
                 />
               </div>
               <div className="flex items-center justify-between gap-3 pt-2">

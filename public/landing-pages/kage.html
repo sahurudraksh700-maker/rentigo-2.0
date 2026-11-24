@@ -4,9 +4,9 @@
 </script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>RentKaro — Don't buy it. Rent it from a classmate.</title>
+<title>Rentigo — Don't buy it. Rent it from a classmate.</title>
 <meta name="description" content="Cameras, projectors, formal wear, cycles and more, from students on your campus.">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2305070a'/%3E%3Ccircle cx='16' cy='17' r='8' fill='%23e0231c'/%3E%3Crect x='4' y='8' width='24' height='2.6' fill='%23dfe7e0'/%3E%3Crect x='7' y='13' width='18' height='2' fill='%23dfe7e0'/%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="/assets/aistudio/Rentigo_Gradient_Circle_Logo_6bb3db80.png">
 <link rel="stylesheet" href="/landing-pages/secret-pathways-assets/fonts.css">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -105,7 +105,7 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 #pre.done{ opacity:0; visibility:hidden; pointer-events:none; }
 .pre-in{ width:min(420px,74vw); text-align:center; }
 .pre-mark{ margin:0 auto 26px; width:44px; height:44px; opacity:.9; }
-.pre-mark svg{ width:100%; height:100%; display:block; }
+.pre-mark img,.pre-mark svg{ width:100%; height:100%; display:block; border-radius:50%; object-fit:cover; }
 .pre-jp{ font-size:12px; letter-spacing:.5em; color:var(--bone-dim); margin-bottom:20px; }
 .pre-bar{ position:relative; height:1px; background:rgba(223,231,224,.14); overflow:hidden; }
 .pre-bar i{ position:absolute; inset:0 100% 0 0; background:var(--bone); transition:right .35s linear; }
@@ -143,7 +143,7 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 .nav.stuck::after{ opacity:1; }
 .nav.hide{ transform:translate3d(0,-101%,0); }
 .brand{ display:flex; align-items:center; gap:11px; flex:0 0 auto; }
-.brand svg{ width:34px; height:34px; display:block; }
+.brand img,.brand svg{ width:34px; height:34px; display:block; border-radius:50%; object-fit:cover; }
 .brand-tx{ display:flex; flex-direction:column; line-height:1; gap:3px; }
 .brand-tx b{ font-size:12px; font-weight:500; letter-spacing:.26em; }
 .brand-tx i{ font-style:normal; font-size:8px; letter-spacing:.34em; color:var(--muted); }
@@ -206,7 +206,7 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 }
 .peek-fr{ display:block; aspect-ratio:16/10;
   background:linear-gradient(180deg, rgba(3,6,9,.04) 24%, rgba(3,6,9,.48) 100%),
-    url('/landing-pages/rentkaro-assets/generated/rentkaro-hero.webp') center / cover no-repeat;
+    url('/landing-pages/rentigo-assets/generated/rentigo-hero.webp') center / cover no-repeat;
   outline:1px solid rgba(223,231,224,.16); outline-offset:-1px;
   box-shadow:0 34px 70px -30px rgba(0,0,0,.9); transition:outline-color .5s; }
 .peek:hover{ transform:translate3d(0,-5px,0); }
@@ -289,17 +289,17 @@ h1,h2,h3{ font-weight:400; margin:0; letter-spacing:-.005em; }
 .card:nth-child(1) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.04) 36%,rgba(3,6,9,.72) 100%),
-    url('/landing-pages/rentkaro-assets/generated/rentkaro-approach.webp') center / cover no-repeat;
+    url('/landing-pages/rentigo-assets/generated/rentigo-approach.webp') center / cover no-repeat;
 }
 .card:nth-child(2) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.06) 36%,rgba(3,6,9,.74) 100%),
-    url('/landing-pages/rentkaro-assets/generated/rentkaro-courtyard.webp') center / cover no-repeat;
+    url('/landing-pages/rentigo-assets/generated/rentigo-courtyard.webp') center / cover no-repeat;
 }
 .card:nth-child(3) .card-fr{
   background:
     linear-gradient(180deg,rgba(3,6,9,.05) 36%,rgba(3,6,9,.74) 100%),
-    url('/landing-pages/rentkaro-assets/generated/rentkaro-handover.webp') center / cover no-repeat;
+    url('/landing-pages/rentigo-assets/generated/rentigo-handover.webp') center / cover no-repeat;
 }
 .card-fr::after{ content:''; position:absolute; inset:0;
   background:linear-gradient(transparent 46%, rgba(4,6,9,.80)); pointer-events:none; }
@@ -630,7 +630,8 @@ body[data-layout-footer="b"] .foot-brand{
   grid-column:1 / -1; display:grid; grid-template-columns:70px minmax(0,1fr); align-items:center;
   padding-bottom:34px; margin-bottom:8px; border-bottom:1px solid var(--line-soft);
 }
-body[data-layout-footer="b"] .foot-brand svg{ width:54px; height:54px; }
+body[data-layout-footer="b"] .foot-brand img,
+body[data-layout-footer="b"] .foot-brand svg{ width:54px; height:54px; border-radius:50%; object-fit:cover; }
 body[data-layout-footer="b"] .foot-brand p{
   margin:0; max-width:48ch; font-size:clamp(18px,2vw,30px); line-height:1.35; color:var(--bone-dim);
 }
@@ -929,10 +930,7 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <div id="pre" aria-hidden="true">
   <div class="pre-in">
     <div class="pre-mark">
-      <svg viewBox="0 0 44 44" fill="none">
-        <circle cx="22" cy="22" r="10" fill="#e63f24" fill-opacity=".9"/>
-        <path d="M9 14h26M14 29h16M22 8v28" stroke="#eceff4" stroke-width="1.5"/>
-      </svg>
+      <img src="/assets/aistudio/Rentigo_Gradient_Circle_Logo_6bb3db80.png" alt="Rentigo official logo" width="52" height="52" style="width:52px;height:52px;border-radius:50%;object-fit:cover;margin:0 auto;">
     </div>
     <div class="pre-jp">CAMPUS · PEER RENTALS</div>
     <div class="pre-bar"><i id="pre-fill"></i></div>
@@ -946,11 +944,8 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 
 <header class="nav" id="nav">
   <a class="brand" href="#top" data-cursor>
-    <svg viewBox="0 0 44 44" fill="none" width="34" height="34" aria-hidden="true">
-      <circle cx="22" cy="22" r="9.2" fill="#e63f24" fill-opacity=".92"/>
-      <path d="M8 14h28M12 29h20M22 8v28" stroke="#eceff4" stroke-width="1.5"/>
-    </svg>
-    <span class="brand-tx"><b>RENTKARO</b><i>CAMPUS PEER RENTALS</i></span>
+    <img src="/assets/aistudio/Rentigo_Gradient_Circle_Logo_6bb3db80.png" alt="Rentigo official logo" width="34" height="34" style="width:34px;height:34px;border-radius:50%;object-fit:cover;flex-shrink:0;">
+    <span class="brand-tx"><b>RENTIGO</b><i>CAMPUS PEER RENTALS</i></span>
   </a>
   <nav class="nav-links" id="navlinks">
     <a class="nav-link" href="/browse" target="_top" data-app-nav="/browse" data-cursor><span>Browse</span><span class="alt">Rentals</span></a>
@@ -1002,9 +997,9 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
     <span class="peek-play"><svg viewBox="0 0 22 22" fill="none"><path d="M8 5.6 16.4 11 8 16.4z" fill="#eceff4"/></svg></span>
     <span class="peek-cap"><b class="jp">CAMPUS</b><i>Main Gate — evening pickup</i></span>
   </a>
-  <div class="word-fb" aria-hidden="true">RENTKARO</div>
+  <div class="word-fb" aria-hidden="true">RENTIGO</div>
   <div class="hero-side" data-rv="up">
-    <span class="v jp">CAMPUS · RENTKARO</span>
+    <span class="v jp">CAMPUS · RENTIGO</span>
   </div>
 </section>
 
@@ -1012,13 +1007,13 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <section class="sec" id="how-it-works" data-cam="1">
   <div class="fg" data-fg="gate" aria-hidden="true">
     <span class="fg-el fg-wall" data-fg-in="left">
-      <img src="/landing-pages/rentkaro-assets/foreground/campus-gate.webp" alt="" width="1536" height="884" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/campus-gate.webp" alt="" width="1536" height="884" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-pine" data-fg-in="right">
-      <img src="/landing-pages/rentkaro-assets/foreground/camera.webp" alt="" width="1024" height="1438" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/camera.webp" alt="" width="1024" height="1438" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-grass" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/library-steps.webp" alt="" width="1536" height="996" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/library-steps.webp" alt="" width="1536" height="996" loading="lazy" decoding="async">
     </span>
   </div>
   <div class="sec-head" data-rv="fade">
@@ -1047,16 +1042,16 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <section class="sec" id="categories" data-cam="2">
   <div class="fg" data-fg="pathways" aria-hidden="true">
     <span class="fg-el fg-sakura fg-el--sway" data-fg-in="left">
-      <img src="/landing-pages/rentkaro-assets/foreground/trees.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/trees.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-leaves fg-el--sway" data-fg-in="right">
-      <img src="/landing-pages/rentkaro-assets/foreground/trees.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/trees.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-lantern" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/projector.webp" alt="" width="1024" height="1499" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/projector.webp" alt="" width="1024" height="1499" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-bush" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/cycle.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/cycle.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
     </span>
   </div>
   <div class="sec-head" data-rv="fade">
@@ -1100,16 +1095,16 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 </section>
 
 <!-- ============================================================ chapter III: why students love it -->
-<section class="sec" id="why-rentkaro" data-cam="3">
+<section class="sec" id="why-rentigo" data-cam="3">
   <div class="fg" data-fg="lessons" aria-hidden="true">
     <span class="fg-el fg-wall" data-fg-in="right">
-      <img src="/landing-pages/rentkaro-assets/foreground/notice-board.webp" alt="" width="1717" height="876" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/notice-board.webp" alt="" width="1717" height="876" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-stones" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/backpack.webp" alt="" width="1536" height="1001" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/backpack.webp" alt="" width="1536" height="1001" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-grass" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/library-steps.webp" alt="" width="1536" height="996" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/library-steps.webp" alt="" width="1536" height="996" loading="lazy" decoding="async">
     </span>
   </div>
   <div class="sec-head" data-rv="fade">
@@ -1151,16 +1146,16 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <section class="sec fin" id="safety" data-cam="4">
   <div class="fg" data-fg="eternity" aria-hidden="true">
     <span class="fg-el fg-hill" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/library-steps.webp" alt="" width="1536" height="996" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/library-steps.webp" alt="" width="1536" height="996" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-ruins" data-fg-in="left">
-      <img src="/landing-pages/rentkaro-assets/foreground/campus-gate.webp" alt="" width="1536" height="884" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/campus-gate.webp" alt="" width="1536" height="884" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-grass" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/cycle.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/cycle.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-sakura" data-fg-in="left">
-      <img src="/landing-pages/rentkaro-assets/foreground/trees.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/trees.webp" alt="" width="1536" height="1024" loading="lazy" decoding="async">
     </span>
   </div>
   <div class="eyebrow" data-rv="fade">Chapter 04 — Campus Safety</div>
@@ -1172,7 +1167,7 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
       <svg viewBox="0 0 14 14" fill="none" width="13" height="13"><path d="M3 11 11 3M5 3h6v6" stroke="#eceff4" stroke-width="1.3"/></svg>
     </a>
     <button class="cta" type="button" data-app-action="google-signin" data-cursor>
-      <i></i><span>Join RentKaro with Google</span>
+      <i></i><span>Join Rentigo with Google</span>
       <svg viewBox="0 0 14 14" fill="none" width="13" height="13"><path d="M3 11 11 3M5 3h6v6" stroke="#eceff4" stroke-width="1.3"/></svg>
     </button>
   </div>
@@ -1182,13 +1177,13 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
 <footer class="foot" data-cam="5">
   <div class="fg" data-fg="foot" aria-hidden="true">
     <span class="fg-el fg-bush" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/backpack.webp" alt="" width="1536" height="1001" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/backpack.webp" alt="" width="1536" height="1001" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-grass" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/notice-board.webp" alt="" width="1717" height="876" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/notice-board.webp" alt="" width="1717" height="876" loading="lazy" decoding="async">
     </span>
     <span class="fg-el fg-stones" data-fg-in="up">
-      <img src="/landing-pages/rentkaro-assets/foreground/camera.webp" alt="" width="1024" height="1438" loading="lazy" decoding="async">
+      <img src="/landing-pages/rentigo-assets/foreground/camera.webp" alt="" width="1024" height="1438" loading="lazy" decoding="async">
     </span>
   </div>
   <div class="foot-cta-band">
@@ -1197,17 +1192,14 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
       <p>Sign in with your student Google account to request rentals or list your spare gear in 60 seconds.</p>
     </div>
     <div style="display:flex;flex-wrap:wrap;gap:12px;">
-      <button class="rk-btn-primary" type="button" data-app-action="google-signin" data-cursor>Join RentKaro with Google</button>
+      <button class="rk-btn-primary" type="button" data-app-action="google-signin" data-cursor>Join Rentigo with Google</button>
       <a class="rk-btn-ghost" href="/browse" target="_top" data-app-nav="/browse" data-cursor>Browse rentals</a>
     </div>
   </div>
   <div class="foot-grid">
     <div class="foot-brand">
-      <svg viewBox="0 0 44 44" fill="none" width="34" height="34" aria-hidden="true">
-        <circle cx="22" cy="22" r="9.2" fill="#e63f24" fill-opacity=".92"/>
-        <path d="M8 14h28M12 29h20M22 8v28" stroke="#eceff4" stroke-width="1.5"/>
-      </svg>
-      <p>RentKaro is the student-run rent-don't-buy marketplace built for college campuses. Borrow what you need for the week, earn from what sits idle.</p>
+      <img src="/assets/aistudio/Rentigo_Gradient_Circle_Logo_6bb3db80.png" alt="Rentigo official logo" width="54" height="54">
+      <p>Rentigo is the student-run rent-don't-buy marketplace built for college campuses. Borrow what you need for the week, earn from what sits idle.</p>
     </div>
     <div><h4>Marketplace</h4><ul>
       <li><a href="/browse" target="_top" data-app-nav="/browse" data-cursor>Browse all gear</a></li>
@@ -1220,13 +1212,13 @@ body[data-layout-footer="b"] .foot-base span:last-child{ text-align:right; }
       <li><a href="#how-it-works" data-cursor>Deposit protection</a></li>
     </ul></div>
     <div><h4>Contact</h4><ul>
-      <li><a href="mailto:campus@rentkaro.in" data-cursor>campus@rentkaro.in</a></li>
+      <li><a href="mailto:rentigo.campus@gmail.com" data-cursor>rentigo.campus@gmail.com</a></li>
       <li><a href="/safety" target="_top" data-app-nav="/safety" data-cursor>Student Union · Block B</a></li>
       <li><a href="/browse" target="_top" data-app-nav="/browse" data-cursor>Mon–Sat · 9am–7pm</a></li>
     </ul></div>
   </div>
   <div class="foot-base">
-    <span>© 2026 RentKaro — Campus Peer Rentals</span>
+    <span>© 2026 Rentigo — Campus Peer Rentals</span>
     <span class="jp">DON'T BUY IT · RENT IT</span>
     <span>WebGL · Onest · Campus</span>
   </div>
@@ -3060,7 +3052,7 @@ function buildWordmark() {
   const m = cvs(4, 4).getContext('2d');
   m.font = '600 ' + SZ + 'px Wordmark, sans-serif';
   m.textBaseline = 'alphabetic'; m.textAlign = 'left';
-  const word = 'RENTKARO', gl = [];
+  const word = 'RENTIGO', gl = [];
   let pen = 0, ascMax = 0, descMax = 0, xMin = 1e9, xMax = -1e9;
   for (const ch of word) {
     const t = m.measureText(ch);
@@ -4363,7 +4355,7 @@ function wireHeroExit() {
 function wireNav() {
   let last = 0;
   const rail = $('#rail');
-  const names = ['Campus Gate', 'How It Works', 'Categories', 'Why Students', 'Safety', 'Join RentKaro'];
+  const names = ['Campus Gate', 'How It Works', 'Categories', 'Why Students', 'Safety', 'Join Rentigo'];
   SECS.forEach((s, i) => {
     const b = document.createElement('button');
     b.innerHTML = '<i></i>'; b.title = names[i] || '';
@@ -4407,8 +4399,16 @@ function wireNav() {
     const href = l.getAttribute('href') || '';
     return href.startsWith('#') ? SECS.indexOf(document.querySelector(href)) : -1;
   });
+  let lastPastHero = null;
   window.addEventListener('scroll', () => {
     const y = scrollY;
+    const pastHero = y > vpH() * 0.65;
+    if (pastHero !== lastPastHero) {
+      lastPastHero = pastHero;
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'rentigo-scroll', pastHero }, '*');
+      }
+    }
     nav.classList.toggle('stuck', y > 40);
     /* and don't even mark it hidden while the menu is open, or the class lands
        the moment the sheet closes and the bar blinks away under the thumb */
@@ -4427,7 +4427,7 @@ function wireNav() {
     if (!path) return;
     e.preventDefault();
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'rentkaro-navigate', path: path }, '*');
+      window.parent.postMessage({ type: 'rentigo-navigate', path: path }, '*');
     } else {
       window.location.href = path;
     }
@@ -4437,7 +4437,7 @@ function wireNav() {
     if (!action) return;
     e.preventDefault();
     if (window.parent && window.parent !== window) {
-      window.parent.postMessage({ type: 'rentkaro-action', action: action }, '*');
+      window.parent.postMessage({ type: 'rentigo-action', action: action }, '*');
     } else {
       window.location.href = '/browse?signin=1';
     }
@@ -4812,24 +4812,39 @@ function boot() {
   });
   document.body.classList.add('is-locked');
   let finished = false;
-  const watchdog = setTimeout(() => {
-    if (!finished && !preEl.classList.contains('done')) {
-      console.warn('[kage] boot watchdog triggered — revealing page');
-      fallback('boot-timeout');
+  let watchdog = null;
+  const revealOverlayEarly = setTimeout(() => {
+    if (!preEl.classList.contains('done')) {
+      preEl.classList.add('done');
+      document.body.classList.remove('is-locked');
+      $$('#hero [data-rv], #hero .mask-line').forEach(e => e.classList.add('rv-in'));
     }
-  }, 6000);
+  }, 4000);
+  const resetWatchdog = () => {
+    if (watchdog) clearTimeout(watchdog);
+    if (finished) return;
+    watchdog = setTimeout(() => {
+      if (!finished && !preEl.classList.contains('done')) {
+        console.warn('[kage] boot watchdog triggered — revealing page');
+        fallback('boot-timeout');
+      }
+    }, 15000);
+  };
+  resetWatchdog();
   let i = 0;
   const step = () => {
     const j = JOBS[i];
     const done = () => {
       i++;
+      resetWatchdog();
       const p = i / JOBS.length;
       preFill.style.right = ((1 - p) * 100).toFixed(1) + '%';
       prePct.textContent = Math.round(p * 100);
       if (i < JOBS.length) setTimeout(step, 16);
       else {
         finished = true;
-        clearTimeout(watchdog);
+        clearTimeout(revealOverlayEarly);
+        if (watchdog) clearTimeout(watchdog);
         setTimeout(start, 180);
       }
     };
@@ -4839,6 +4854,7 @@ function boot() {
       console.error('[kage] job "' + j[0] + '" failed', err);
       if (i <= 1) {
         finished = true;
+        clearTimeout(revealOverlayEarly);
         clearTimeout(watchdog);
         return fallback(err);          /* no renderer, no scene */
       }

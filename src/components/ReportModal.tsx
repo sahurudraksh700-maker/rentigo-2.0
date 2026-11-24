@@ -2,43 +2,93 @@ import { Flag, X } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { listingsService } from '../services/listingsService';
+import { moderationService } from '../services/moderationService';
+import type { ReportTargetType } from '../types/rentigo';
 
 interface ReportModalProps {
-  listingId: string;
+  targetType?: ReportTargetType;
+  targetId?: string;
+  listingId?: string;
+  targetUserId?: string;
   listingTitle: string;
   onClose: () => void;
 }
 
-const REPORT_REASONS = [
-  'Misleading photos or description',
-  'Prohibited or unsafe campus item',
-  'Suspicious deposit or pricing',
-  'Unresponsive or duplicate listing',
-  'Other',
-];
+const REPORT_REASONS_BY_TYPE: Record<ReportTargetType, string[]> = {
+  listing: [
+    'Misleading photos or description',
+    'Prohibited or unsafe campus item',
+    'Suspicious deposit or pricing',
+    'Unresponsive or duplicate listing',
+    'Other',
+  ],
+  user: [
+    'Harassment or abusive behaviour',
+    'No-show or repeated cancellation',
+    'Fake student identity',
+    'Off-platform payment scam attempt',
+    'Other',
+  ],
+  message: [
+    'Spam or unsolicited promotion',
+    'Abusive or threatening message',
+    'Attempted off-platform payment/scam',
+    'Other',
+  ],
+  review: [
+    'Contains abusive language or slurs',
+    'Spam or unrelated review',
+    'Retaliatory or factually false claim',
+    'Other',
+  ],
+};
 
-export function ReportModal({ listingId, listingTitle, onClose }: ReportModalProps) {
-  const { user } = useAuth();
+export function ReportModal({
+  targetType = 'listing',
+  targetId,
+  listingId,
+  targetUserId,
+  listingTitle,
+  onClose,
+}: ReportModalProps) {
+  const { user, openSignIn } = useAuth();
   const { showToast } = useToast();
-  const [reason, setReason] = useState(REPORT_REASONS[0]);
+  const reasons = REPORT_REASONS_BY_TYPE[targetType];
+  const [reason, setReason] = useState(reasons[0]);
   const [details, setDetails] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  const effectiveTargetId = targetId ?? listingId ?? targetUserId ?? '';
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+    if (!user) {
+      openSignIn();
+      return;
+    }
     setSubmitting(true);
     try {
-      await listingsService.reportListing({
+      const { autoHiddenListing } = await moderationService.submitReport({
+        targetType,
+        targetId: effectiveTargetId,
         listingId,
-        reporterId: user?.id ?? 'anonymous',
+        targetUserId,
+        reporterId: user.id,
         reason,
         details,
       });
-      showToast('Report submitted. Campus moderators will review it.', 'success');
+      showToast(
+        autoHiddenListing
+          ? 'Report submitted. This listing was automatically hidden pending admin review.'
+          : 'Report submitted. Campus moderators will review it.',
+        'success',
+      );
       onClose();
-    } catch {
-      showToast('Could not submit report. Please try again.', 'error');
+    } catch (err) {
+      showToast(
+        err instanceof Error ? err.message : 'Could not submit report. Please try again.',
+        'error',
+      );
     } finally {
       setSubmitting(false);
     }
@@ -49,14 +99,14 @@ export function ReportModal({ listingId, listingTitle, onClose }: ReportModalPro
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="rk-report-title"
+      aria-labelledby="rentigo-report-title"
     >
       <div className="w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b101d] text-slate-900 dark:text-slate-100 shadow-2xl overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-800">
           <div className="flex items-center gap-2">
             <Flag className="w-4 h-4 text-[#e63f24]" />
-            <h2 id="rk-report-title" className="text-base font-medium">
-              Report Listing
+            <h2 id="rentigo-report-title" className="text-base font-medium capitalize">
+              Report {targetType}
             </h2>
           </div>
           <button
@@ -71,7 +121,10 @@ export function ReportModal({ listingId, listingTitle, onClose }: ReportModalPro
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <p className="text-xs text-slate-500 dark:text-slate-400">
-            Reporting: <span className="font-medium text-slate-800 dark:text-slate-200">{listingTitle}</span>
+            Reporting:{' '}
+            <span className="font-medium text-slate-800 dark:text-slate-200">
+              {listingTitle}
+            </span>
           </p>
 
           <div>
@@ -83,7 +136,7 @@ export function ReportModal({ listingId, listingTitle, onClose }: ReportModalPro
               onChange={(e) => setReason(e.target.value)}
               className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#070a12] px-3.5 py-2.5 text-sm outline-none focus:border-[#e63f24]"
             >
-              {REPORT_REASONS.map((r) => (
+              {reasons.map((r) => (
                 <option key={r} value={r}>
                   {r}
                 </option>

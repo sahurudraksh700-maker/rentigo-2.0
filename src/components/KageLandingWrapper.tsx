@@ -4,33 +4,46 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { KageLandingPage } from '../shaders/landing-pages/LandingPages';
 
-export function KageLandingWrapper() {
+interface KageLandingWrapperProps {
+  onScrollPastHeroChange?: (pastHero: boolean) => void;
+}
+
+export function KageLandingWrapper({ onScrollPastHeroChange }: KageLandingWrapperProps) {
   const navigate = useNavigate();
   const { user, openSignIn } = useAuth();
+
+  useEffect(() => {
+    onScrollPastHeroChange?.(false);
+    return () => {
+      onScrollPastHeroChange?.(true);
+    };
+  }, [onScrollPastHeroChange]);
 
   useEffect(() => {
     const handleMessage = (event: MessageEvent) => {
       const data = event.data;
       if (!data || typeof data !== 'object') return;
 
-      if (data.type === 'rentkaro-navigate' && typeof data.path === 'string') {
+      if (data.type === 'rentigo-navigate' && typeof data.path === 'string') {
         if (data.path === '/listings/new' && !user) {
           openSignIn('/listings/new');
           return;
         }
         navigate(data.path);
-      } else if (data.type === 'rentkaro-action' && data.action === 'google-signin') {
+      } else if (data.type === 'rentigo-action' && data.action === 'google-signin') {
         if (user) {
           navigate('/dashboard');
         } else {
           openSignIn('/browse');
         }
+      } else if (data.type === 'rentigo-scroll' && typeof data.pastHero === 'boolean') {
+        onScrollPastHeroChange?.(data.pastHero);
       }
     };
 
     window.addEventListener('message', handleMessage);
     return () => window.removeEventListener('message', handleMessage);
-  }, [navigate, openSignIn, user]);
+  }, [navigate, onScrollPastHeroChange, openSignIn, user]);
 
   return (
     <div

@@ -1,24 +1,49 @@
 import {
+  AlertTriangle,
+  Camera,
   Check,
+  CheckSquare,
   Copy,
+  Gift,
+  IndianRupee,
   MessageCircle,
+  MessageSquare,
   PauseCircle,
   Pencil,
   Phone,
   PlayCircle,
   Plus,
+  Receipt,
+  Settings,
   Star,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useCallback, useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { HandoverModal } from '../components/HandoverModal';
+import { ReceiptModal } from '../components/ReceiptModal';
+import { ReturnSettleModal } from '../components/ReturnSettleModal';
+import { ReviewModal } from '../components/ReviewModal';
+import { TrustBadges } from '../components/TrustBadges';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { chatService } from '../services/chatService';
 import { listingsService } from '../services/listingsService';
+import { moderationService } from '../services/moderationService';
+import { paymentsService, type OwnerEarningsSummary } from '../services/paymentsService';
 import { requestsService } from '../services/requestsService';
+import { reviewsService } from '../services/reviewsService';
 import { usersService } from '../services/usersService';
-import type { Listing, RentalRequest, RequestStatus, UserProfile } from '../types/rentkaro';
+import type {
+  Listing,
+  PaymentRecord,
+  RentalRequest,
+  RequestStatus,
+  Review,
+  UserProfile,
+} from '../types/rentigo';
 import { formatDisplayDate } from '../utils/dates';
+import { usePageMeta } from '../utils/seo';
 
 type DashboardTab = 'listings' | 'received' | 'rentals';
 
@@ -42,9 +67,12 @@ function StatusText({ status }: { status: RequestStatus }) {
 }
 
 export function DashboardPage() {
-  const { user, openSignIn, updateProfile } = useAuth();
+  const { user, openSignIn, refreshUsers } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  usePageMeta({ title: 'Dashboard — Rentigo' });
 
   const initialTab = (searchParams.get('tab') as DashboardTab) || 'listings';
   const [tab, setTab] = useState<DashboardTab>(
@@ -56,14 +84,25 @@ export function DashboardPage() {
   const [myRentals, setMyRentals] = useState<RentalRequest[]>([]);
   const [listingsMap, setListingsMap] = useState<Record<string, Listing>>({});
   const [usersMap, setUsersMap] = useState<Record<string, UserProfile>>({});
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [paymentsByReq, setPaymentsByReq] = useState<Record<string, PaymentRecord>>({});
+  const [earnings, setEarnings] = useState<OwnerEarningsSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const [editingProfile, setEditingProfile] = useState(false);
-  const [profileName, setProfileName] = useState('');
-  const [profileCollege, setProfileCollege] = useState('');
-  const [profilePhone, setProfilePhone] = useState('');
-  const [savingProfile, setSavingProfile] = useState(false);
+  const [handoverTarget, setHandoverTarget] = useState<{
+    req: RentalRequest;
+    stage: 'pickup' | 'return';
+  } | null>(null);
+  const [returnTarget, setReturnTarget] = useState<RentalRequest | null>(null);
+  const [reviewTarget, setReviewTarget] = useState<{
+    req: RentalRequest;
+    targetName: string;
+  } | null>(null);
+  const [receiptTarget, setReceiptTarget] = useState<{
+    payment: PaymentRecord;
+    req: RentalRequest;
+  } | null>(null);
 
   const loadDashboard = useCallback(async () => {
     if (!user) {
@@ -72,20 +111,36 @@ export function DashboardPage() {
     }
     setLoading(true);
     try {
-      const [allListings, allUsers, received, rentals] = await Promise.all([
-        listingsService.listAll(),
+      const [
+        allListings,
+        allUsers,
+        received,
+        rentals,
+        allReviews,
+        userPayments,
+        ownerEarnings,
+      ] = await Promise.all([
+        listingsService.listAllIncludingHidden(),
         usersService.listUsers(),
         requestsService.listByOwner(user.id),
         requestsService.listByRenter(user.id),
+        reviewsService.listAll(),
+        paymentsService.listByUser(user.id),
+        paymentsService.getOwnerEarningsSummary(user.id),
       ]);
 
       const lMap: Record<string, Listing> = {};
       for (const l of allListings) lMap[l.id] = l;
       const uMap: Record<string, UserProfile> = {};
       for (const u of allUsers) uMap[u.id] = u;
+      const pMap: Record<string, PaymentRecord> = {};
+      for (const p of userPayments) pMap[p.requestId] = p;
 
       setListingsMap(lMap);
       setUsersMap(uMap);
+      setPaymentsByReq(pMap);
+      setReviews(allReviews);
+      setEarnings(ownerEarnings);
       setMyListings(allListings.filter((l) => l.ownerId === user.id));
       setReceivedRequests(received);
       setMyRentals(rentals);
@@ -105,14 +160,6 @@ export function DashboardPage() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (user) {
-      setProfileName(user.name);
-      setProfileCollege(user.college);
-      setProfilePhone(user.phone);
-    }
-  }, [user]);
-
   const switchTab = (next: DashboardTab) => {
     setTab(next);
     const params = new URLSearchParams(searchParams);
@@ -128,7 +175,7 @@ export function DashboardPage() {
             Your Campus Dashboard
           </h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            Sign in with Google to manage your posted items, incoming requests, and active rentals.
+            Sign in with Google to manage your posted items, incoming requests, handover checklists, and earnings.
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">
             <button
@@ -149,27 +196,6 @@ export function DashboardPage() {
       </main>
     );
   }
-
-  const handleSaveProfile = async (e: FormEvent) => {
-    e.preventDefault();
-    if (!profileName.trim() || !profileCollege.trim() || !profilePhone.trim()) {
-      showToast('Please complete all profile fields.', 'error');
-      return;
-    }
-    setSavingProfile(true);
-    try {
-      await updateProfile({
-        name: profileName.trim(),
-        college: profileCollege.trim(),
-        phone: profilePhone.trim(),
-      });
-      setEditingProfile(false);
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'Update failed.', 'error');
-    } finally {
-      setSavingProfile(false);
-    }
-  };
 
   const handleTogglePause = async (listingId: string) => {
     try {
@@ -198,19 +224,71 @@ export function DashboardPage() {
   ) => {
     try {
       await requestsService.updateStatus(requestId, user.id, nextStatus);
+      await refreshUsers();
       const msgs: Record<RequestStatus, string> = {
         Pending: 'Updated',
-        Accepted: 'Request accepted! Your WhatsApp number is now shared with the renter.',
+        Accepted: 'Request accepted! WhatsApp contact is now shared.',
         Returned: 'Marked as returned. Deposit settled!',
         Declined: 'Request declined.',
         Cancelled: 'Request cancelled.',
       };
-      showToast(msgs[nextStatus], nextStatus === 'Accepted' || nextStatus === 'Returned' ? 'success' : 'info');
+      showToast(
+        msgs[nextStatus],
+        nextStatus === 'Accepted' || nextStatus === 'Returned' ? 'success' : 'info',
+      );
       await loadDashboard();
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Action failed.', 'error');
     }
   };
+
+  const handleOpenChat = async (req: RentalRequest) => {
+    try {
+      const conv = await chatService.getOrCreateConversation({
+        listingId: req.listingId,
+        renterId: req.renterId,
+        ownerId: req.ownerId,
+      });
+      navigate(`/messages?conv=${encodeURIComponent(conv.id)}`);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Unable to open chat', 'error');
+    }
+  };
+
+  const handleOpenDispute = async (req: RentalRequest) => {
+    const item = listingsMap[req.listingId];
+    const photos = [
+      ...(req.pickupChecklist?.photos ?? []),
+      ...(req.returnChecklist?.photos ?? []),
+    ];
+    const checklistSummary = [
+      req.pickupChecklist
+        ? `Pickup: ${req.pickupChecklist.itemsChecked.join(', ')} (${req.pickupChecklist.conditionNotes || 'No notes'})`
+        : 'Pickup checklist not submitted',
+      req.returnChecklist
+        ? `Return: ${req.returnChecklist.itemsChecked.join(', ')} (${req.returnChecklist.conditionNotes || 'No notes'})`
+        : 'Return checklist not submitted',
+    ].join(' | ');
+
+    try {
+      const ticket = await moderationService.createSupportTicket({
+        userId: user.id,
+        type: 'dispute',
+        subject: `Booking dispute: ${item?.title ?? req.id}`,
+        description: `Dispute opened for booking ${req.id} (${req.startDate} to ${req.endDate}). Deposit status: ${req.depositStatus}.`,
+        bookingId: req.id,
+        listingId: req.listingId,
+        attachments: { photos, checklistSummary },
+      });
+      showToast(`Dispute ticket #${ticket.id} opened for admin review`, 'info');
+      await loadDashboard();
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Could not create dispute', 'error');
+    }
+  };
+
+  const hasUserReviewed = (requestId: string) =>
+    reviews.some((r) => r.requestId === requestId && r.reviewerId === user.id);
 
   const copyPhone = async (phone: string) => {
     try {
@@ -229,38 +307,50 @@ export function DashboardPage() {
 
   return (
     <main className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10 space-y-8">
-      {/* Profile Header */}
-      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f1b] p-6">
+      {/* Profile & Earnings Summary */}
+      <section className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0b0f1b] p-6 space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 rounded-full bg-[#e63f24] text-white text-xl font-semibold flex items-center justify-center shrink-0">
               {user.firstName.charAt(0)}
             </div>
             <div>
-              <h1 className="text-xl sm:text-2xl font-normal text-slate-950 dark:text-white">
-                {user.name}
-              </h1>
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-normal text-slate-950 dark:text-white">
+                  {user.name}
+                </h1>
+                <TrustBadges user={user} compact />
+              </div>
               <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
                 <span>{user.college}</span>
                 <span aria-hidden="true">·</span>
-                <span className="tabular-nums">{user.phone}</span>
-                <span aria-hidden="true">·</span>
                 <span className="inline-flex items-center gap-1 text-slate-700 dark:text-slate-200 tabular-nums">
                   <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  {user.rating.toFixed(1)}
+                  {user.rating.toFixed(1)} ({user.reviewCount})
                 </span>
+                <span aria-hidden="true">·</span>
+                <Link to={`/u/${user.id}`} className="text-[#e63f24] hover:underline">
+                  View public profile
+                </Link>
               </div>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              type="button"
-              onClick={() => setEditingProfile((v) => !v)}
-              className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-[#e63f24] transition-colors"
+            <Link
+              to="/referrals"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-xs font-medium text-emerald-700 dark:text-emerald-300"
             >
-              {editingProfile ? 'Cancel Edit' : 'Edit Profile'}
-            </button>
+              <Gift className="w-3.5 h-3.5" />
+              <span>Credits: ₹{(user.creditBalance || 0).toLocaleString('en-IN')}</span>
+            </Link>
+            <Link
+              to="/settings"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-slate-700 dark:text-slate-200 hover:border-[#e63f24] transition-colors"
+            >
+              <Settings className="w-3.5 h-3.5" />
+              <span>Settings</span>
+            </Link>
             <Link
               to="/listings/new"
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#e63f24] hover:bg-[#cc3118] text-white text-xs font-medium transition-colors"
@@ -271,57 +361,43 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {editingProfile && (
-          <form
-            onSubmit={handleSaveProfile}
-            className="mt-6 pt-6 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4"
-          >
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                Full Name
-              </label>
-              <input
-                type="text"
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3 py-2 text-sm outline-none focus:border-[#e63f24]"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                College / Campus
-              </label>
-              <input
-                type="text"
-                value={profileCollege}
-                onChange={(e) => setProfileCollege(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3 py-2 text-sm outline-none focus:border-[#e63f24]"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1">
-                WhatsApp / Phone
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="tel"
-                  value={profilePhone}
-                  onChange={(e) => setProfilePhone(e.target.value)}
-                  className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] px-3 py-2 text-sm outline-none focus:border-[#e63f24]"
-                  required
-                />
-                <button
-                  type="submit"
-                  disabled={savingProfile}
-                  className="px-4 py-2 rounded-xl bg-[#e63f24] text-white text-xs font-medium shrink-0"
-                >
-                  Save
-                </button>
+        {/* Owner Earnings Summary Strip */}
+        {earnings && (
+          <div className="pt-5 border-t border-slate-100 dark:border-slate-800 grid grid-cols-1 sm:grid-cols-3 gap-4 tabular-nums">
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] p-4">
+              <div className="text-xs text-slate-500">Total Earned (Completed)</div>
+              <div className="mt-1 text-xl font-semibold flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <IndianRupee className="w-4 h-4" />
+                {earnings.totalEarned.toLocaleString('en-IN')}
               </div>
             </div>
-          </form>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] p-4">
+              <div className="text-xs text-slate-500">Active Rentals Pending Payout</div>
+              <div className="mt-1 text-xl font-semibold">
+                ₹{earnings.pendingEarnings.toLocaleString('en-IN')}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-[#070a12] p-4">
+              <div className="text-xs text-slate-500">Deposits Held on Active Items</div>
+              <div className="mt-1 text-xl font-semibold">
+                ₹{earnings.depositsHeld.toLocaleString('en-IN')}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {earnings && earnings.perItem.length > 0 && (
+          <div className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap gap-2">
+            <span className="font-medium text-slate-700 dark:text-slate-300">Per item:</span>
+            {earnings.perItem.slice(0, 4).map((p) => (
+              <span
+                key={p.listingId}
+                className="rounded-lg border border-slate-200 dark:border-slate-800 px-2.5 py-1"
+              >
+                {p.listingTitle.slice(0, 28)} · ₹{p.earnedAmount.toLocaleString('en-IN')} earned
+              </span>
+            ))}
+          </div>
         )}
       </section>
 
@@ -423,18 +499,26 @@ export function DashboardPage() {
                         <span aria-hidden="true">·</span>
                         <span>₹{item.deposit} deposit</span>
                         <span aria-hidden="true">·</span>
-                        <span>{item.pickupLocation}</span>
+                        <span>{item.college}</span>
                         <span aria-hidden="true">·</span>
                         <span
                           className={
-                            item.isPaused
-                              ? 'text-slate-500'
-                              : rentedToday
-                                ? 'text-[#e63f24] font-medium'
-                                : 'text-emerald-600 dark:text-emerald-400 font-medium'
+                            item.isHiddenByModeration
+                              ? 'text-[#e63f24] font-medium'
+                              : item.isPaused
+                                ? 'text-slate-500'
+                                : rentedToday
+                                  ? 'text-[#e63f24] font-medium'
+                                  : 'text-emerald-600 dark:text-emerald-400 font-medium'
                           }
                         >
-                          {item.isPaused ? 'Paused' : rentedToday ? 'Rented' : 'Available'}
+                          {item.isHiddenByModeration
+                            ? 'Hidden by Moderation'
+                            : item.isPaused
+                              ? 'Paused'
+                              : rentedToday
+                                ? 'Rented'
+                                : 'Available'}
                         </span>
                       </div>
                     </div>
@@ -513,6 +597,8 @@ export function DashboardPage() {
             {receivedRequests.map((req) => {
               const item = listingsMap[req.listingId];
               const renter = usersMap[req.renterId];
+              const payment = paymentsByReq[req.id];
+              const reviewed = hasUserReviewed(req.id);
               return (
                 <div
                   key={req.id}
@@ -542,12 +628,18 @@ export function DashboardPage() {
                             {item?.title ?? 'Listing removed'}
                           </Link>
                           <StatusText status={req.status} />
+                          <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                            Deposit: {req.depositStatus}
+                          </span>
                         </div>
                         <div className="mt-1 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
                           Requested by{' '}
-                          <span className="font-medium text-slate-900 dark:text-slate-200">
+                          <Link
+                            to={`/u/${req.renterId}`}
+                            className="font-medium text-slate-900 dark:text-slate-200 hover:text-[#e63f24]"
+                          >
                             {renter?.name ?? 'Student'}
-                          </span>{' '}
+                          </Link>{' '}
                           ({renter?.college ?? 'Campus'}) · {formatDisplayDate(req.startDate)} –{' '}
                           {formatDisplayDate(req.endDate)} ({req.days} day
                           {req.days === 1 ? '' : 's'})
@@ -570,44 +662,125 @@ export function DashboardPage() {
                     </div>
                   </div>
 
-                  {req.status === 'Pending' && (
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-end gap-2.5">
+                  {/* Action Toolbar */}
+                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        onClick={() => handleRequestAction(req.id, 'Declined')}
-                        className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-[#e63f24] hover:text-[#e63f24] transition-colors"
+                        onClick={() => handleOpenChat(req)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
                       >
-                        Decline
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat</span>
                       </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRequestAction(req.id, 'Accepted')}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#e63f24] hover:bg-[#cc3118] text-white text-xs font-medium transition-colors"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        <span>Accept Request</span>
-                      </button>
-                    </div>
-                  )}
 
-                  {req.status === 'Accepted' && (
-                    <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                        <Phone className="w-3.5 h-3.5 text-emerald-500" />
-                        <span>
-                          Renter WhatsApp:{' '}
-                          <strong className="font-medium text-slate-900 dark:text-white tabular-nums">
-                            {renter?.phone ?? 'Not provided'}
-                          </strong>
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRequestAction(req.id, 'Returned')}
-                        className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-medium hover:opacity-90 transition-opacity"
-                      >
-                        Mark Item Returned
-                      </button>
+                      {payment && (
+                        <button
+                          type="button"
+                          onClick={() => setReceiptTarget({ payment, req })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
+                        >
+                          <Receipt className="w-3.5 h-3.5" />
+                          <span>Receipt</span>
+                        </button>
+                      )}
+
+                      {(req.status === 'Accepted' || req.status === 'Returned') && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setHandoverTarget({ req, stage: 'pickup' })}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>
+                              Pickup {req.pickupChecklist ? '✓' : 'Checklist'}
+                            </span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setHandoverTarget({ req, stage: 'return' })}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
+                          >
+                            <CheckSquare className="w-3.5 h-3.5" />
+                            <span>
+                              Return {req.returnChecklist ? '✓' : 'Checklist'}
+                            </span>
+                          </button>
+                          {!req.disputeTicketId ? (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenDispute(req)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-amber-600 dark:text-amber-400 hover:border-amber-500"
+                            >
+                              <AlertTriangle className="w-3.5 h-3.5" />
+                              <span>Dispute</span>
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                              Dispute #{req.disputeTicketId} open
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                      {req.status === 'Pending' && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleRequestAction(req.id, 'Declined')}
+                            className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-[#e63f24] hover:text-[#e63f24] transition-colors"
+                          >
+                            Decline
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRequestAction(req.id, 'Accepted')}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#e63f24] hover:bg-[#cc3118] text-white text-xs font-medium transition-colors"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Accept Request</span>
+                          </button>
+                        </>
+                      )}
+
+                      {req.status === 'Accepted' && (
+                        <button
+                          type="button"
+                          onClick={() => setReturnTarget(req)}
+                          className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-white text-white dark:text-slate-950 text-xs font-medium hover:opacity-90 transition-opacity"
+                        >
+                          Mark Item Returned
+                        </button>
+                      )}
+
+                      {req.status === 'Returned' && !reviewed && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReviewTarget({
+                              req,
+                              targetName: renter?.firstName ?? 'Renter',
+                            })
+                          }
+                          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#e63f24] text-white text-xs font-medium"
+                        >
+                          <Star className="w-3.5 h-3.5" />
+                          <span>Review Renter</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {req.status === 'Accepted' && renter && (
+                    <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 rounded-xl px-3.5 py-2.5">
+                      <Phone className="w-3.5 h-3.5" />
+                      <span>
+                        Renter WhatsApp unlocked:{' '}
+                        <strong className="tabular-nums">{renter.phone}</strong>
+                      </span>
                     </div>
                   )}
                 </div>
@@ -635,6 +808,8 @@ export function DashboardPage() {
           {myRentals.map((req) => {
             const item = listingsMap[req.listingId];
             const owner = usersMap[req.ownerId];
+            const payment = paymentsByReq[req.id];
+            const reviewed = hasUserReviewed(req.id);
             return (
               <div
                 key={req.id}
@@ -664,19 +839,24 @@ export function DashboardPage() {
                           {item?.title ?? 'Listing removed'}
                         </Link>
                         <StatusText status={req.status} />
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                          Deposit: {req.depositStatus}
+                        </span>
                       </div>
                       <div className="mt-1 text-xs text-slate-600 dark:text-slate-400 tabular-nums">
-                        Owner: {owner?.name ?? 'Student'} ({owner?.college ?? 'Campus'}) ·{' '}
-                        {formatDisplayDate(req.startDate)} – {formatDisplayDate(req.endDate)} (
-                        {req.days} day{req.days === 1 ? '' : 's'})
+                        Owner:{' '}
+                        <Link to={`/u/${req.ownerId}`} className="hover:text-[#e63f24] font-medium">
+                          {owner?.name ?? 'Student'}
+                        </Link>{' '}
+                        ({owner?.college ?? 'Campus'}) · {formatDisplayDate(req.startDate)} –{' '}
+                        {formatDisplayDate(req.endDate)} ({req.days} day
+                        {req.days === 1 ? '' : 's'})
                       </div>
-                      <div className="mt-1 text-[11px] text-slate-400">
-                        {req.status === 'Pending' && 'Pending → Accepted → Returned'}
-                        {req.status === 'Accepted' && 'Accepted — Ready for campus handover'}
-                        {req.status === 'Returned' && 'Completed · Returned & deposit settled'}
-                        {req.status === 'Declined' && 'Declined by owner'}
-                        {req.status === 'Cancelled' && 'Cancelled by you'}
-                      </div>
+                      {req.depositDeductionReason && (
+                        <div className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                          Deduction ₹{req.depositDeductionAmount}: {req.depositDeductionReason}
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -685,32 +865,107 @@ export function DashboardPage() {
                       ₹{req.totalAmount.toLocaleString('en-IN')}
                     </div>
                     <div className="text-xs text-slate-500 dark:text-slate-400">
-                      incl. ₹{req.depositSnapshot.toLocaleString('en-IN')} deposit
+                      {req.creditsUsed > 0
+                        ? `saved ₹${req.creditsUsed} credits`
+                        : `incl. ₹${req.depositSnapshot.toLocaleString('en-IN')} deposit`}
                     </div>
                   </div>
                 </div>
 
-                {req.status === 'Pending' && (
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2.5">
+                  <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => handleRequestAction(req.id, 'Cancelled')}
-                      className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-[#e63f24] hover:text-[#e63f24] transition-colors"
+                      onClick={() => handleOpenChat(req)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
                     >
-                      Cancel Request
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      <span>Chat</span>
                     </button>
+
+                    {payment && (
+                      <button
+                        type="button"
+                        onClick={() => setReceiptTarget({ payment, req })}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        <span>Receipt</span>
+                      </button>
+                    )}
+
+                    {(req.status === 'Accepted' || req.status === 'Returned') && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setHandoverTarget({ req, stage: 'pickup' })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
+                        >
+                          <Camera className="w-3.5 h-3.5" />
+                          <span>Pickup {req.pickupChecklist ? '✓' : 'Checklist'}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setHandoverTarget({ req, stage: 'return' })}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium hover:border-[#e63f24]"
+                        >
+                          <CheckSquare className="w-3.5 h-3.5" />
+                          <span>Return {req.returnChecklist ? '✓' : 'Checklist'}</span>
+                        </button>
+                        {!req.disputeTicketId ? (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenDispute(req)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs font-medium text-amber-600 dark:text-amber-400 hover:border-amber-500"
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            <span>Dispute</span>
+                          </button>
+                        ) : (
+                          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
+                            Dispute #{req.disputeTicketId} open
+                          </span>
+                        )}
+                      </>
+                    )}
                   </div>
-                )}
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    {(req.status === 'Pending' || req.status === 'Accepted') && (
+                      <button
+                        type="button"
+                        onClick={() => handleRequestAction(req.id, 'Cancelled')}
+                        className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-xs font-medium text-slate-700 dark:text-slate-300 hover:border-[#e63f24] hover:text-[#e63f24] transition-colors"
+                      >
+                        Cancel Request ({req.cancellationPolicySnapshot})
+                      </button>
+                    )}
+
+                    {req.status === 'Returned' && !reviewed && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setReviewTarget({
+                            req,
+                            targetName: owner?.firstName ?? 'Owner',
+                          })
+                        }
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#e63f24] text-white text-xs font-medium"
+                      >
+                        <Star className="w-3.5 h-3.5" />
+                        <span>Review Owner &amp; Item</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
 
                 {req.status === 'Accepted' && owner && (
-                  <div className="pt-3 border-t border-slate-100 dark:border-slate-800 rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/25 p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5 text-sm text-emerald-950 dark:text-emerald-200">
                       <Phone className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span>
                         Owner WhatsApp / Phone:{' '}
-                        <strong className="font-semibold tabular-nums">
-                          {owner.phone}
-                        </strong>
+                        <strong className="font-semibold tabular-nums">{owner.phone}</strong>
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -738,6 +993,54 @@ export function DashboardPage() {
             );
           })}
         </div>
+      )}
+
+      {handoverTarget && (
+        <HandoverModal
+          request={handoverTarget.req}
+          listingTitle={listingsMap[handoverTarget.req.listingId]?.title ?? 'Campus Item'}
+          stage={handoverTarget.stage}
+          onClose={() => setHandoverTarget(null)}
+          onSuccess={() => {
+            setHandoverTarget(null);
+            loadDashboard();
+          }}
+        />
+      )}
+
+      {returnTarget && (
+        <ReturnSettleModal
+          request={returnTarget}
+          listingTitle={listingsMap[returnTarget.listingId]?.title ?? 'Campus Item'}
+          onClose={() => setReturnTarget(null)}
+          onSuccess={() => {
+            setReturnTarget(null);
+            refreshUsers();
+            loadDashboard();
+          }}
+        />
+      )}
+
+      {reviewTarget && (
+        <ReviewModal
+          requestId={reviewTarget.req.id}
+          targetName={reviewTarget.targetName}
+          listingTitle={listingsMap[reviewTarget.req.listingId]?.title ?? 'Campus Item'}
+          onClose={() => setReviewTarget(null)}
+          onSuccess={() => {
+            setReviewTarget(null);
+            loadDashboard();
+          }}
+        />
+      )}
+
+      {receiptTarget && (
+        <ReceiptModal
+          payment={receiptTarget.payment}
+          request={receiptTarget.req}
+          listingTitle={listingsMap[receiptTarget.req.listingId]?.title ?? 'Campus Item'}
+          onClose={() => setReceiptTarget(null)}
+        />
       )}
     </main>
   );

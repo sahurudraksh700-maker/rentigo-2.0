@@ -1,11 +1,16 @@
 import type {
+  CancellationPolicy,
   ItemCondition,
   Listing,
   ListingCategory,
-  ListingReport,
-} from '../types/rentkaro';
+  ModerationReport,
+} from '../types/rentigo';
+import { extractCampusName } from '../utils/badges';
 import { expandDateRange, todayIsoDate } from '../utils/dates';
-import { dbStore } from './storage';
+import { discoveryService } from './discoveryService';
+import { moderationService } from './moderationService';
+import { dbStore, emitStoreChange } from './storage';
+import { wishlistService } from './wishlistService';
 
 export interface ListingInput {
   ownerId: string;
@@ -15,14 +20,21 @@ export interface ListingInput {
   photos: string[];
   pricePerDay: number;
   deposit: number;
+  lateFeePerDay?: number;
+  cancellationPolicy?: CancellationPolicy;
   condition: ItemCondition;
   pickupLocation: string;
+  college?: string;
   availableFrom: string;
   availableTo: string;
 }
 
 export const listingsService = {
   async listAll(): Promise<Listing[]> {
+    return dbStore.getListings().filter((l) => !l.isHiddenByModeration);
+  },
+
+  async listAllIncludingHidden(): Promise<Listing[]> {
     return dbStore.getListings();
   },
 
@@ -35,7 +47,35 @@ export const listingsService = {
     return dbStore.getListings().filter((item) => item.ownerId === ownerId);
   },
 
+  async incrementViewCount(id: string): Promise<void> {
+    const items = dbStore.getListings();
+    let changed = false;
+    const next = items.map((l) => {
+      if (l.id === id) {
+        changed = true;
+        return { ...l, viewCount: (l.viewCount || 0) + 1 };
+      }
+      return l;
+    });
+    if (changed) dbStore.saveListings(next);
+  },
+
   async create(input: ListingInput): Promise<Listing> {
+    const owner = dbStore.getUsers().find((u) => u.id === input.ownerId);
+    if (!owner) throw new Error('Account not found.');
+    if (owner.isBanned) throw new Error('Account suspended.');
+
+    const settings = dbStore.getPlatformSettings();
+    if (settings.requireVerificationToTransact && !owner.isVerified) {
+      throw new Error(
+        'Please verify your student status in Settings before publishing a listing.',
+      );
+    }
+
+    const pricePerDay = Math.round(Number(input.pricePerDay));
+    const defaultLateFee = Math.max(50, Math.round(pricePerDay * 0.5));
+    const campus = input.college?.trim() || extractCampusName(owner.college);
+
     const newItem: Listing = {
       id: `lst_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`,
       ownerId: input.ownerId,
@@ -43,17 +83,28 @@ export const listingsService = {
       description: input.description.trim(),
       category: input.category,
       photos: input.photos.slice(0, 4),
-      pricePerDay: Math.round(Number(input.pricePerDay)),
+      pricePerDay,
       deposit: Math.round(Number(input.deposit)),
+      lateFeePerDay:
+        input.lateFeePerDay !== undefined
+          ? Math.max(0, Math.round(Number(input.lateFeePerDay)))
+          : defaultLateFee,
+      cancellationPolicy: input.cancellationPolicy ?? 'Flexible',
       condition: input.condition,
       pickupLocation: input.pickupLocation.trim(),
+      college: campus,
       availableFrom: input.availableFrom,
       availableTo: input.availableTo,
       isPaused: false,
+      viewCount: 0,
+      reportCount: 0,
       createdAt: new Date().toISOString(),
     };
+
     const items = dbStore.getListings();
     dbStore.saveListings([newItem, ...items]);
+    await discoveryService.checkSavedSearchAlertsForNewListing(newItem);
+    emitStoreChange();
     return newItem;
   },
 
@@ -68,23 +119,36 @@ export const listingsService = {
     if (existing.ownerId !== ownerId) {
       throw new Error('Only the owner can modify this listing.');
     }
+
     const updated: Listing = {
       ...existing,
       ...patch,
       title: (patch.title ?? existing.title).trim(),
       description: (patch.description ?? existing.description).trim(),
       pickupLocation: (patch.pickupLocation ?? existing.pickupLocation).trim(),
+      college: (patch.college ?? existing.college).trim(),
       photos: patch.photos ? patch.photos.slice(0, 4) : existing.photos,
       pricePerDay:
         patch.pricePerDay !== undefined
           ? Math.round(Number(patch.pricePerDay))
           : existing.pricePerDay,
       deposit:
-        patch.deposit !== undefined
-          ? Math.round(Number(patch.deposit))
-          : existing.deposit,
+        patch.deposit !== undefined ? Math.round(Number(patch.deposit)) : existing.deposit,
+      lateFeePerDay:
+        patch.lateFeePerDay !== undefined
+          ? Math.max(0, Math.round(Number(patch.lateFeePerDay)))
+          : existing.lateFeePerDay,
     };
+
     dbStore.saveListings(items.map((item) => (item.id === id ? updated : item)));
+
+    if (updated.isPaused) {
+      wishlistService.markWatchersUnavailable(id);
+    } else if (existing.isPaused && !updated.isPaused) {
+      await wishlistService.notifySavedUsersIfAvailable(id);
+    }
+
+    emitStoreChange();
     return updated;
   },
 
@@ -102,6 +166,7 @@ export const listingsService = {
       throw new Error('Only the owner can delete this listing.');
     }
     dbStore.saveListings(items.filter((item) => item.id !== id));
+    emitStoreChange();
   },
 
   getBookedDatesSync(listingId: string): string[] {
@@ -128,17 +193,15 @@ export const listingsService = {
     reporterId: string;
     reason: string;
     details: string;
-  }): Promise<ListingReport> {
-    const report: ListingReport = {
-      id: `rep_${Date.now().toString(36)}`,
+  }): Promise<ModerationReport> {
+    const { report } = await moderationService.submitReport({
+      targetType: 'listing',
+      targetId: input.listingId,
       listingId: input.listingId,
       reporterId: input.reporterId,
       reason: input.reason,
-      details: input.details.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    const reports = dbStore.getReports();
-    dbStore.saveReports([report, ...reports]);
+      details: input.details,
+    });
     return report;
   },
 };
